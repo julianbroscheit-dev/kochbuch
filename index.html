@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Rezeptbuch">
+    <title>Rezeptbuch - Saatzucht Steinach</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f9f8f5;
+            color: #333;
+            padding-bottom: 100px;
+        }
+        
+        header {
+            background: white;
+            padding: 1rem;
+            text-align: center;
+            border-bottom: 1px solid #e5e0d9;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        header h1 { font-size: 1.3rem; color: #618150; }
+        
+        .container { max-width: 100%; padding: 1rem; }
+        
+        .recipe-card {
+            background: white;
+            border: 1px solid #e5e0d9;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+        }
+        
+        .recipe-card:active { background: #f0f7ec; }
+        
+        .recipe-title { font-weight: 600; color: #1a1a1a; }
+        .recipe-desc { font-size: 0.85rem; color: #666; margin-top: 0.3rem; }
+        
+        .nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            background: white;
+            border-top: 1px solid #e5e0d9;
+            z-index: 50;
+        }
+        
+        .nav button {
+            flex: 1;
+            padding: 1rem;
+            background: white;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            border-top: 3px solid transparent;
+        }
+        
+        .nav button.active {
+            border-top-color: #618150;
+            color: #618150;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+        }
+        
+        .modal.show { display: flex; align-items: center; justify-content: center; }
+        
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            max-height: 80vh;
+            overflow-y: auto;
+            width: 90%;
+        }
+        
+        .btn {
+            background: #618150;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            width: 100%;
+            margin: 0.5rem 0;
+        }
+        
+        .btn:active { opacity: 0.8; }
+        
+        .btn-secondary {
+            background: #f0ebe3;
+            color: #333;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #e5e0d9;
+            border-radius: 6px;
+            font-size: 16px;
+            margin: 0.5rem 0;
+        }
+        
+        label { display: block; font-weight: 600; margin-top: 1rem; }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📖 Rezeptbuch</h1>
+    </header>
+    
+    <div class="container" id="recipes-list"></div>
+    
+    <div class="nav">
+        <button onclick="showList()">📖</button>
+        <button onclick="showAdd()">➕</button>
+        <button onclick="showList()">🛒</button>
+    </div>
+    
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div id="detailContent"></div>
+            <button class="btn btn-secondary" onclick="closeModal()">Zurück</button>
+        </div>
+    </div>
+    
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <h2>Neues Rezept</h2>
+            <label>Name</label>
+            <input id="newName" type="text" placeholder="Rezeptname">
+            <label>Zeit</label>
+            <input id="newTime" type="text" placeholder="z.B. 30 min">
+            <label>Zutaten</label>
+            <textarea id="newZutaten" placeholder="Hier Zutaten eingeben"></textarea>
+            <label>Schritte</label>
+            <textarea id="newSchritte" placeholder="Hier Schritte eingeben"></textarea>
+            <button class="btn" onclick="saveRecipe()">✅ Speichern</button>
+            <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+        </div>
+    </div>
+
+    <script>
+        let recipes = JSON.parse(localStorage.getItem('recipes')) || [
+            {
+                id: 1,
+                name: 'Pasta Carbonara',
+                time: '20 min',
+                zutaten: '400g Pasta\n200g Speck\n3 Eier\n100g Parmesan',
+                schritte: '1. Wasser kochen\n2. Speck anbraten\n3. Pasta kochen\n4. Kombinieren'
+            }
+        ];
+
+        function save() {
+            localStorage.setItem('recipes', JSON.stringify(recipes));
+        }
+
+        function showList() {
+            const html = recipes.map(r => `
+                <div class="recipe-card" onclick="showDetail(${r.id})">
+                    <div class="recipe-title">${r.name}</div>
+                    <div class="recipe-desc">⏱️ ${r.time}</div>
+                </div>
+            `).join('');
+            document.getElementById('recipes-list').innerHTML = html || '<p>Keine Rezepte</p>';
+            closeModal();
+        }
+
+        function showDetail(id) {
+            const r = recipes.find(x => x.id === id);
+            const html = `
+                <h2>${r.name}</h2>
+                <p><strong>⏱️ ${r.time}</strong></p>
+                <h3>Zutaten</h3>
+                <p>${r.zutaten.replace(/\n/g, '<br>')}</p>
+                <h3>Schritte</h3>
+                <p>${r.schritte.replace(/\n/g, '<br>')}</p>
+                <button class="btn" style="background: #d9534f;" onclick="deleteRecipe(${id})">🗑️ Löschen</button>
+            `;
+            document.getElementById('detailContent').innerHTML = html;
+            document.getElementById('detailModal').classList.add('show');
+        }
+
+        function showAdd() {
+            document.getElementById('addModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('show');
+            document.getElementById('addModal').classList.remove('show');
+        }
+
+        function saveRecipe() {
+            const name = document.getElementById('newName').value.trim();
+            if (!name) return alert('Name erforderlich!');
+            
+            recipes.push({
+                id: Date.now(),
+                name: name,
+                time: document.getElementById('newTime').value || '?',
+                zutaten: document.getElementById('newZutaten').value,
+                schritte: document.getElementById('newSchritte').value
+            });
+            
+            save();
+            document.getElementById('newName').value = '';
+            document.getElementById('newTime').value = '';
+            document.getElementById('newZutaten').value = '';
+            document.getElementById('newSchritte').value = '';
+            closeModal();
+            showList();
+        }
+
+        function deleteRecipe(id) {
+            if (confirm('Wirklich löschen?')) {
+                recipes = recipes.filter(r => r.id !== id);
+                save();
+                closeModal();
+                showList();
+            }
+        }
+
+        showList();
+    </script>
+</body>
